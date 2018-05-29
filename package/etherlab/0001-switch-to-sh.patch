@@ -1,0 +1,28 @@
+diff -r 7bdc9b9a82fe script/ethercatctl.in
+--- a/script/ethercatctl.in	Mon May 21 10:16:53 2018 -0600
++++ b/script/ethercatctl.in	Tue May 29 10:48:25 2018 -0600
+@@ -1,4 +1,4 @@
+-#!/bin/bash
++#!/bin/sh
+ 
+ #------------------------------------------------------------------------------
+ #
+@@ -182,7 +182,8 @@
+ 
+     RESULT=0
+ 
+-    for i in `seq 0 $(expr ${MASTER_COUNT} - 1)`; do
++    i=0
++    while [ "$i" -lt ${MASTER_COUNT} ]; do
+         echo -n "Master${i} "
+ 
+         # Check if the master is in idle or operation phase
+@@ -196,6 +197,8 @@
+             echo " dead"
+             RESULT=1
+         fi
++
++        i=$(( i + 1 ))
+     done
+ 
+     exit ${RESULT}
