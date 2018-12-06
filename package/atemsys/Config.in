@@ -1,0 +1,10 @@
+comment "atemsys needs a Linux kernel to be built"
+	depends on !BR2_LINUX_KERNEL
+
+config BR2_PACKAGE_ATEMSYS
+	bool "atemsys"
+	depends on BR2_LINUX_KERNEL
+	help
+	  Atemsys for Linux.
+
+	  http://www.acontis.com/eng/products/downloads/ethercat-for-ti-processors.html
