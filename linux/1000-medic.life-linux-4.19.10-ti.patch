@@ -1,0 +1,13 @@
+--- a/arch/arm/configs/rcn-ee_defconfig.orig	2019-03-18 11:58:12.000000000 -0600
++++ b/arch/arm/configs/rcn-ee_defconfig	2019-03-18 12:00:28.000000000 -0600
+@@ -804,8 +804,8 @@
+ # CONFIG_NET_VENDOR_SOCIONEXT is not set
+ # CONFIG_NET_VENDOR_STMICRO is not set
+ # CONFIG_NET_VENDOR_SYNOPSYS is not set
+-CONFIG_TI_CPSW=y
+-CONFIG_TI_CPTS=y
++# CONFIG_TI_CPSW is not set
++# CONFIG_TI_CPTS is not set
+ # CONFIG_NET_VENDOR_VIA is not set
+ CONFIG_WIZNET_W5100=y
+ CONFIG_WIZNET_W5100_SPI=y

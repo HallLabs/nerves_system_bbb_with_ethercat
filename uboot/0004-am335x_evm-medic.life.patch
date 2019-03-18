@@ -1,9 +1,0 @@
-Index: uboot-2017.09/configs/am335x_evm_defconfig
-===================================================================
---- uboot-2017.09.orig/configs/am335x_evm_defconfig
-+++ uboot-2017.09/configs/am335x_evm_defconfig
-@@ -47,3 +47,4 @@ CONFIG_LZO=y
- CONFIG_OF_LIBFDT=y
- CONFIG_OF_LIBFDT_OVERLAY=y
- CONFIG_PHY_MSCC=y
-+CONFIG_DISABLE_CPSW=y
