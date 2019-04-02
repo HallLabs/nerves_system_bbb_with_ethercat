@@ -10,7 +10,7 @@ defmodule NervesSystemBbb.MixProject do
     [
       app: @app,
       version: @version,
-      elixir: "~> 1.4",
+      elixir: "~> 1.6",
       compilers: Mix.compilers() ++ [:nerves_package],
       nerves_package: nerves_package(),
       description: description(),
@@ -26,7 +26,7 @@ defmodule NervesSystemBbb.MixProject do
   end
 
   defp bootstrap(args) do
-    System.put_env("MIX_TARGET", "bbb_with_ethercat")
+    set_target()
     Application.start(:nerves_bootstrap)
     Mix.Task.run("loadconfig", args)
   end
@@ -37,6 +37,7 @@ defmodule NervesSystemBbb.MixProject do
       artifact_sites: [
         {:github_releases, "NewVistas/#{@app}"}
       ],
+      build_runner_opts: build_runner_opts(),
       platform: Nerves.System.BR,
       platform_config: [
         defconfig: "nerves_defconfig"
@@ -47,11 +48,11 @@ defmodule NervesSystemBbb.MixProject do
 
   defp deps do
     [
-      {:nerves, "~> 1.0", runtime: false},
-      {:nerves_system_br, "1.0.1", runtime: false},
-      {:nerves_toolchain_arm_unknown_linux_gnueabihf, "1.0.0", runtime: false},
+      {:nerves, "~> 1.3", runtime: false},
+      {:nerves_system_br, "1.7.1", runtime: false},
+      {:nerves_toolchain_arm_unknown_linux_gnueabihf, "1.1.0", runtime: false},
       {:nerves_system_linter, "~> 0.3.0", runtime: false},
-      {:ex_doc, "~> 0.18", only: :dev}
+      {:ex_doc, "~> 0.18", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -72,25 +73,42 @@ defmodule NervesSystemBbb.MixProject do
 
   defp package_files do
     [
+      "fwup_include",
+      "linux",
+      "rootfs_overlay",
+      "uboot",
+      "busybox.fragment",
+      "CHANGELOG.md",
+      "fwup-revert.conf",
+      "fwup.conf",
       "LICENSE",
       "mix.exs",
       "nerves_defconfig",
-      "README.md",
-      "VERSION",
-      "rootfs_overlay",
-      "fwup.conf",
-      "fwup-revert.conf",
-      "post-createfs.sh",
       "post-build.sh",
-      "uboot",
-      "uboot-script.cmd",
-      "bbb-busybox.config",
-      "linux"
+      "post-createfs.sh",
+      "README.md",
+      "VERSION"
     ]
   end
 
   # Copy the images referenced by docs, since ex_doc doesn't do this.
   defp copy_images(_) do
     File.cp_r("assets", "doc/assets")
+  end
+
+  defp build_runner_opts() do
+    if primary_site = System.get_env("BR2_PRIMARY_SITE") do
+      [make_args: ["BR2_PRIMARY_SITE=#{primary_site}"]]
+    else
+      []
+    end
+  end
+
+  defp set_target() do
+    if function_exported?(Mix, :target, 1) do
+      apply(Mix, :target, [:target])
+    else
+      System.put_env("MIX_TARGET", "target")
+    end
   end
 end
