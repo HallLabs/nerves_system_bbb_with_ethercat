@@ -1,6 +1,6 @@
 /*-----------------------------------------------------------------------------
  * atemsys.c
- * Copyright (c) 2009 - 2017 acontis technologies GmbH, Weingarten, Germany
+ * Copyright (c) 2009 - 2019 acontis technologies GmbH, Weingarten, Germany
  * All rights reserved.
  *
  * This program is free software; you can redistribute  it and/or modify it
@@ -89,43 +89,19 @@
  *   see ioctl(IOCTL_INT_CONNECT)
  *
  *
- *  Changes:
+ *  Changes see atemsys.h
  *
- *  V1.0.00 - Inital, PCI/PCIe only.
- *  V1.1.00 - PowerPC tweaks.
- *           Support for SoC devices (no PCI, i.e. Freescale eTSEC).
- *           Support for current linux kernel's (3.0). Removed deprecated code.
- *  V1.2.00 - 64 bit support. Compat IOCTL's for 32-Bit usermode apps.
- *  V1.2.01 - request_irq() sometimes failed -> Map irq to virq under powerpc.
- *  V1.2.02 - Support for current Linux kernel (3.8.0)
- *  V1.2.03 - Support for current Linux kernel (3.8.13) on armv7l (beaglebone)
- *  V1.2.04 - Use dma_alloc_coherent for arm, because of DMA memory corruption on
- *           Xilinx Zynq.
- *  V1.2.05 - OF Device Tree support for Xilinx Zynq (VIRQ mapping)
- *  V1.2.06 - Wrong major version.
- *  V1.2.07 - Tolerate closing, e.g. due to system()-calls.
- *  V1.2.08 - Add VM_DONTCOPY to prevent crash on system()-calls
- *  V1.2.09 - Apply second controller name change in dts (standard GEM driver for Xilinx Zynq) to avoid default driver loading.
- *  V1.2.10 - Removed IO address alignment to support R6040
- *  V1.2.11 - Fixed lockup in device_read (tLinkOsIst if NIC in interrupt mode) on dev_int_disconnect
- *  V1.2.12 - Fixed underflow in dev_disable_irq() when more than one interrupts pending because of disable_irq_nosync usage
- *  V1.2.13 - Fixed usage of x64 PCI physical addresses
- *  V1.2.14 - Changes for using with kernel beginnig from 2.6.18
- *  V1.2.15 - Add udev auto-loading support via DTB
- *  V1.2.16 - Add interrupt mode support for Xenomai 3 (Cobalt)
- *  V1.3.01 - Add IOCTL_MOD_GETVERSION
- *  V1.3.02 - Add support for kernel >= 4.11.00
- *  V1.3.03 - Fixed IOCTL_MOD_GETVERSION
- *  V1.3.04 - Fixed interrupt deadlock in Xenomai 2
- *  V1.3.05 - Use correct PCI domain
- *  V1.3.06 - Use rtdm_printk for Cobalt, add check if dev_int_disconnect was successful
- *  V1.3.07 - Removed IOCTL_PCI_RELEASE_DEVICE warnings due to untracked IOCTL_PCI_CONF_DEVICE
- *  V1.3.08 - Add support for kernel >= 4.13.00
  *----------------------------------------------------------------------------*/
+
+#define ATEMSYS_C
 
 #include <linux/module.h>
 #include "atemsys.h"
 #include <linux/pci.h>
+
+#if !(defined NO_IRQ) && (defined __aarch64__)
+#define NO_IRQ   ((unsigned int)(-1))
+#endif
 
 #if (defined CONFIG_XENO_COBALT)
 #include <rtdm/driver.h>
@@ -137,6 +113,7 @@
 #include <linux/semaphore.h>
 #include <linux/mutex.h>
 #include <linux/sched.h>
+#include <linux/smp.h>
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,11,00))
 #include <linux/sched/signal.h>
 #endif
@@ -173,9 +150,6 @@
 
 /* define this if IO memory should also be mapped into the kernel (for debugging only) */
 #undef DEBUG_IOREMAP
-
-#define ATEMSYS_VERSION_STR "1.3.08"
-#define ATEMSYS_VERSION_NUM  1,3,8
 
 MODULE_AUTHOR("acontis technologies GmbH <info@acontis.com>");
 MODULE_DESCRIPTION("Generic usermode PCI driver");
@@ -302,7 +276,7 @@ static int dev_irq_disabled(irq_proc* pIp)
 }
 #endif /* !CONFIG_XENO_COBALT */
 
-#if !defined(__arm__)
+#if !(defined __arm__) && !(defined __aarch64__)
 static void * dev_dma_alloc(u32 dwLen, dma_addr_t *pDmaAddr)
 {
    unsigned long virtAddr;
@@ -361,7 +335,7 @@ static void dev_munmap(struct vm_area_struct *vma)
    if (pMnode->pPcidev == NULL)
 #endif
    {
-#  ifdef __arm__
+#  if (defined __arm__) || (defined __aarch64__)
       dma_free_coherent(S_dev, pMnode->len, pMnode->pVirtAddr, pMnode->dmaAddr);
 #  else
       dev_dma_free(pMnode->len, pMnode->pVirtAddr);
@@ -370,7 +344,11 @@ static void dev_munmap(struct vm_area_struct *vma)
 #ifdef CONFIG_PCI
    else
    {
+#if (defined __aarch64__)
+      dma_free_coherent(&pMnode->pPcidev->dev, pMnode->len, pMnode->pVirtAddr, pMnode->dmaAddr);
+#else
       pci_free_consistent(pMnode->pPcidev, pMnode->len, pMnode->pVirtAddr, pMnode->dmaAddr);
+#endif
    }
 #endif
    kfree(pMnode);
@@ -727,6 +705,8 @@ static int ioctl_int_connect(dev_node* pDevDesc, unsigned long ioctlParam)
           && ((irq = atemsys_of_map_irq_to_virq("gianfar", ioctlParam, 1)) == NO_IRQ) /* PPC, eTSEC */
           /* standard GEM driver for Xilinx Zynq, second controller name changed in dts to avoid default driver loading */
           && ((irq = atemsys_of_map_irq_to_virq("cdns,gem-ethercat", ioctlParam, 0)) == NO_IRQ)
+          /* PRU-ICSS for am572x, am335x */
+          && ((irq = atemsys_of_map_irq_to_virq("acontis,device", 0, ioctlParam)) == NO_IRQ)
           /* Use interrupt number at idx 0 (Catch-All-Interrupt) for GEM */
           && ((irq = atemsys_of_map_irq_to_virq("xlnx,ps7-ethernet-1.00.a", ioctlParam, 0)) == NO_IRQ) /* ARM, Xilinx Zynq */
          )
@@ -1304,7 +1284,11 @@ static int device_mmap(struct file *filp, struct vm_area_struct *vma)
 #ifdef CONFIG_PCI
       if (pDevDesc->pPcidev != NULL)
       {
+#if (defined __aarch64__)
+         pVa = dma_alloc_coherent(&pDevDesc->pPcidev->dev, dwLen, &dmaAddr, GFP_KERNEL);
+#else
          pVa = pci_alloc_consistent(pDevDesc->pPcidev, dwLen, &dmaAddr);
+#endif
          if (! pVa)
          {
             ERR("mmap: pci_alloc_consistent failed\n");
@@ -1315,7 +1299,7 @@ static int device_mmap(struct file *filp, struct vm_area_struct *vma)
       else
 #endif /* CONFIG_PCI */
       {
-#ifdef __arm__
+#if (defined __arm__) || (defined __aarch64__)
          /* dma_alloc_coherent() is currently not tested on PPC.
           * TODO test this and remove legacy dev_dma_alloc()
           */
@@ -1344,15 +1328,15 @@ static int device_mmap(struct file *filp, struct vm_area_struct *vma)
        * would be necessary from usermode.
        * Can't do that without a kernel call because this OP's are privileged.
        */
-#ifdef __arm__
+#if (defined __arm__) || (defined __aarch64__)
       vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 #endif
 
       /* map the whole physically contiguous area in one piece */
       if ((nRet = remap_pfn_range(vma,
-                                 vma->vm_start,
-                                 dmaAddr >> PAGE_SHIFT,
-                                 dwLen,
+                                 vma->vm_start,         /* User space virtual addr*/
+                                 dmaAddr >> PAGE_SHIFT, /* physical page frame number */
+                                 dwLen,                 /* size in bytes */
                                  vma->vm_page_prot)) < 0)
       {
          ERR("remap_pfn_range failed\n");
@@ -1382,7 +1366,7 @@ static int device_mmap(struct file *filp, struct vm_area_struct *vma)
       vma->vm_ops = &mmap_vmop;
       vma->vm_private_data = pMmapNode;
 
-      INF("mmap: mapped DMA memory, Phys:0x%p KVirt:0x%p UVirt:0x%p Size:%u\n",
+      INF("mmap: mapped DMA memory, Phys:0x%p KVirt:0x%p UVirt:0x%p Size:0x%x\n",
              (void *)(unsigned long)dmaAddr, (void *)pVa, (void *)vma->vm_start, dwLen);
    }
 
@@ -1398,7 +1382,7 @@ ExitAndFree:
    if (pDevDesc->pPcidev == NULL)
 #endif
    {
-#ifdef __arm__
+#if (defined __arm__) || (defined __aarch64__)
       dma_free_coherent(S_dev, dwLen, pVa, dmaAddr);
 #else
       dev_dma_free(dwLen, pVa);
@@ -1407,12 +1391,58 @@ ExitAndFree:
 #ifdef CONFIG_PCI
    else
    {
+#if (defined __aarch64__)
+      dma_free_coherent(&pDevDesc->pPcidev->dev, dwLen, pVa, dmaAddr);
+#else
       pci_free_consistent(pDevDesc->pPcidev, dwLen, pVa, dmaAddr);
+#endif
    }
 #endif
 Exit:
    return nRet;
 }
+
+#if (defined(__GNUC__) && (defined(__ARM__) || defined(__arm__) || defined(__aarch64__)))
+static void ioctl_enableCycleCount(void* arg)
+{
+   __u32 dwEnableUserMode = *(__u32*)arg;
+   /* Make CCNT accessible from usermode */
+#if !defined(__aarch64__)
+   __asm__ __volatile__("mcr p15, 0, %0, c9, c14, 0" :: "r"(dwEnableUserMode));
+#else
+   /* aarch32: PMUSERENR => aarch64: PMUSERENR_EL0 */
+   __asm__ __volatile__("msr PMUSERENR_EL0, %0" :: "r"(dwEnableUserMode));
+#endif
+
+   if (dwEnableUserMode)
+   {
+#if !defined(__aarch64__)
+      /* Disable counter flow interrupt */
+      __asm__ volatile ("mcr p15, 0, %0, c9, c14, 2" :: "r"(0x8000000f));
+      /* Initialize CCNT */
+      __asm__ volatile ("mcr p15, 0, %0, c9, c12, 0" :: "r"(5));
+      /* Start CCNT */
+      __asm__ volatile ("mcr p15, 0, %0, c9, c12, 1" :: "r"(0x80000000));
+#else
+      /* Disable counter flow interrupt */  /* aarch32:PMINTENCLR => aarch64:PMINTENCLR_EL1 */
+      __asm__ volatile ("msr PMINTENCLR_EL1, %0" :: "r"(0x8000000f));
+      /* Initialize CCNT */  /* aarch32:PMCR       => aarch64:PMCR_EL0*/
+      __asm__ volatile ("msr PMCR_EL0, %0" :: "r"(5));
+      /* Start CCNT */  /*  aarch32:PMCNTENSET => aarch64:PMCNTENSET_EL0 */
+      __asm__ volatile ("msr PMCNTENSET_EL0, %0" :: "r"(0x80000000));
+#endif
+   }
+   else
+   {
+#if !defined(__aarch64__)
+      __asm__ volatile ("mcr p15, 0, %0, c9, c12, 0" :: "r"(0));
+#else
+      /* aarch32:PMCR       => aarch64:PMCR_EL0 */
+      __asm__ volatile ("msr PMCR_EL0, %0" :: "r"(0));
+#endif
+   }
+}
+#endif
 
 /*
  * This function is called whenever a process tries to do an ioctl on our
@@ -1538,6 +1568,30 @@ static long atemsys_ioctl(
          break;
       }
 
+      case IOCTL_CPU_ENABLE_CYCLE_COUNT:
+      {
+#if (defined(__GNUC__) && (defined(__ARM__) || defined(__arm__) || defined(__aarch64__)))
+         __u32 dwEnableUserMode = 0;
+     
+#if (defined CONFIG_XENO_COBALT)
+         nRetval = rtdm_safe_copy_from_user(fd, &dwEnableUserMode, user_arg, sizeof(__u32));
+#else
+         nRetval = get_user(dwEnableUserMode, (__u32*)arg);
+#endif
+         if (nRetval)
+         {
+            ERR("ioctl IOCTL_CPU_ENABLE_CYCLE_COUNT failed: %d\n", nRetval);
+            goto Exit;
+         }
+         
+         on_each_cpu(ioctl_enableCycleCount, &dwEnableUserMode, 1);
+#else
+         nRetval = -ENODEV;
+         goto Exit;
+#endif
+         break;
+      }
+
       default:
       {
          nRetval = -ENODEV;
@@ -1552,7 +1606,7 @@ Exit:
    return nRetval;
 }
 
-#ifdef CONFIG_COMPAT
+#if (defined CONFIG_COMPAT) && !(defined CONFIG_XENO_COBALT)
 /*
  * ioctl processing for 32 bit process on 64 bit system
  */
@@ -1563,7 +1617,7 @@ static long atemsys_compat_ioctl(
 {
    return atemsys_ioctl(file, cmd, (unsigned long) compat_ptr(arg));
 }
-#endif
+#endif /* CONFIG_COMPAT && !CONFIG_XENO_COBALT */
 
 /* Module Declarations */
 
@@ -1596,19 +1650,18 @@ static struct rtdm_device device = {
         .driver = &driver,
         .label = ATEMSYS_DEVICE_NAME,
 };
-#else
-
+#else /* !CONFIG_XENO_COBALT */
 struct file_operations Fops = {
    .read = device_read,
    .unlocked_ioctl = atemsys_ioctl,
-#ifdef CONFIG_COMPAT
+#if (defined CONFIG_COMPAT)
    .compat_ioctl = atemsys_compat_ioctl, /* ioctl processing for 32 bit process on 64 bit system */
 #endif
    .open = device_open,
    .mmap = device_mmap,
    .release = device_release,   /* a.k.a. close */
 };
-#endif /* CONFIG_XENO_COBALT */
+#endif /* !CONFIG_XENO_COBALT */
 
 /*
  * Initialize the module - Register the character device
