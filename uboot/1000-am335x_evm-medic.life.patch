@@ -1,0 +1,12 @@
+--- uboot-2018.07/configs/am335x_evm_defconfig.orig
++++ uboot-2018.07/configs/am335x_evm_defconfig
+@@ -36,7 +36,8 @@
+ CONFIG_MMC_OMAP_HS=y
+ CONFIG_SPI_FLASH=y
+ CONFIG_SPI_FLASH_WINBOND=y
+-CONFIG_DRIVER_TI_CPSW=y
++CONFIG_DRIVER_TI_CPSW=n
++CONFIG_DISABLE_CPSW=y
+ CONFIG_PHY_MSCC=y
+ CONFIG_SYS_NS16550=y
+ CONFIG_SPI=y

@@ -1,5 +1,190 @@
 # Changelog
 
+## v2.2.1
+
+* Bug fixes
+  * Re-enabled Ralink rt2800usb WiFi driver.
+
+* Improvements
+  * Bump C compiler options to `-O2` from `-Os`. This provides a small, but
+    measurable performance improvement (500ms at boot in a trivial project
+    tested on [nerves_system_rpi0](https://github.com/nerves-project/nerves_system_rpi0)).
+  * Added r8712u.ko WiFi driver.
+
+* Updated dependencies
+  * [nerves_system_br v1.7.1](https://github.com/nerves-project/nerves_system_br/releases/tag/v1.7.1)
+
+## v2.2.0
+
+ * Updated dependencies
+  * [nerves_system_br v1.7.0](https://github.com/nerves-project/nerves_system_br/releases/tag/v1.7.0)
+  * Erlang 21.2.7
+  * Linux 4.19.26 with the Beagleboard Debian kernel patches
+
+## v2.1.3
+
+ * Updated dependencies
+  * [nerves_system_br v1.6.8](https://github.com/nerves-project/nerves_system_br/releases/tag/v1.6.8)
+  * Erlang 21.2.6
+
+## v2.1.2
+
+* Updated dependencies
+  * [nerves_system_br v1.6.6](https://github.com/nerves-project/nerves_system_br/releases/tag/v1.6.6)
+  * Erlang 21.2.4
+  * boardid 1.5.3
+
+## v2.1.1
+
+* Updated dependencies
+  * [nerves_system_br v1.6.5](https://github.com/nerves-project/nerves_system_br/releases/tag/v1.6.5)
+  * Erlang 21.2.2
+  * boardid 1.5.2
+  * erlinit 1.4.9
+  * OpenSSL 1.1.1a
+  * Linux 4.19.10 with the Beagleboard Debian kernel patches
+
+* Enhancements
+  * Moved boardid config from inside erlinit.config to /etc/boardid.config
+
+## v2.1.0
+
+This pulls in a pending patch in Buildroot to update the version of
+OpenSSL from 1.0.2 to 1.1.0h. This fixes what appears to be issues with
+Erlang using OpenSSL engines. It also enables Erlang crypto algorithms
+such as ed25519 that have been added in recent Erlang releases.
+
+* Updated dependencies
+  * [nerves_system_br v1.6.1](https://github.com/nerves-project/nerves_system_br/releases/tag/v1.6.1)
+  * Erlang 21.2
+* Added dependencies
+  * wpa_passphrase
+  * libp11 0.4.9
+
+## v2.0.0
+
+* Enhancements
+  * Enable `AM335X-PRU-UIO-00A0` device tree overlay for PRU support.
+    See the [README.md](https://github.com/nerves-project/nerves_system_bbb/README.md#prus) for more information.
+* Updated dependencies
+  * [nerves_system_br v1.5.3](https://github.com/nerves-project/nerves_system_br/releases/tag/v1.5.3)
+
+## v2.0.0-rc.0
+
+This is a backwards incompatible update to `nerves_system_bbb`. Over-the-air
+updates to existing devices will not work. If you're a production user of
+`nerves_system_bbb`, please consider supporting efforts to maintain a v1.4.0
+branch.
+
+The v2.0.0 support adds the following:
+
+1. Device tree overlays are applied by U-Boot now. Support in Nerves is nearly
+   identical to Beagleboard.org's Debian distribution. This fixes significant
+   issues in v1.4.0 and before ever since upstream moved from loading device
+   tree overlays in Linux to U-Boot.
+2. Support for automatic failback of bad new builds. If enabled, your Nerves
+   application will need to mark a software update as good (for example, it can
+   contact a server) or else the next reboot will revert.
+3. The application partition uses F2FS rather than EXT4. This noticeably
+   improves startup time on the first boot and has some less obvious advantages
+   from being a Flash-aware file system.
+4. The hardware watchdog is enabled at boot. Your application must enable
+   `heart` now.
+5. The U-Boot environment was increased in size to 128 KB. This was required for
+   the new device tree overlay support and unfortunately makes migrating devices
+   from v1.4.0 not possible without significant work.
+
+
+* Updated dependencies
+  * [nerves_system_br v1.5.2](https://github.com/nerves-project/nerves_system_br/releases/tag/v1.5.2)
+  * Linux 4.18.9 + The Beagleboard Debian kernel patches
+  * Erlang 21.0.9
+
+## v1.4.0
+
+This release contains various updates to provisioning variables and data.
+
+**Host requirements**
+
+Building firmware using this system requires `fwup` to be updated on your
+host computer to at least `v1.2.5`. The target minimum version requirement
+has not changed from `0.15.0`.
+
+**Serial numbers**
+
+Device serial numbers are now set using `NERVES_SERIAL_NUMBER` instead of
+`SERIAL_NUMBER`. This is to reduce ambiguity on the source of the serial
+by name spacing it along side other Nerves variables. The U-Boot environment
+key has also changed from `serial_number` to `nerves_serial_number`. The
+erlinit.config has been updated to provide backwards compatibility for setting
+the hostname from the serial number by checking for `nerves_serial_number`
+and falling back to `serial_number`.
+
+**Custom provisioning**
+
+Provisioning data is applied at the time of calling the `fwup` task `complete`.
+The `complete` task is executed when writing the firmware to the target disk.
+During this time, `fwup` will include the contents of a provisioning file
+located at `${NERVES_SYSTEM}/images/fwup_include/provisioning.conf`. By default,
+this file only sets `nerves_serial_number`. You can add additional provisioning
+data by overriding the location of this file to include your own by setting
+the environment variable `NERVES_PROVISIONING`. If you override this variable
+you will be responsible for also setting `nerves_serial_number`.
+
+* Updated dependencies
+  * [nerves_system_br v1.4.5](https://github.com/nerves-project/nerves_system_br/releases/tag/v1.4.5)
+
+## v1.3.0
+
+This release upgrades gcc from version 6.3.0 to 7.3.0. See the toolchain release
+notes for more information.
+
+Switch to using busybox.fragment for easier maintainance.
+
+* Updated dependencies
+  * [nerves_system_br v1.4.1](https://github.com/nerves-project/nerves_system_br/releases/tag/v1.4.1)
+  * [nerves_toolchain_arm_unknown_linux_gnueabihf v1.1.0](https://github.com/nerves-project/toolchains/releases/tag/v1.1.0)
+
+## v1.2.1
+
+* Updated dependencies
+  * [nerves_system_br v1.3.2](https://github.com/nerves-project/nerves_system_br/releases/tag/v1.3.2)
+
+## v1.2.0
+
+This release updates Erlang to OTP 21.0
+
+* Updated dependencies
+  * [nerves_system_br v1.3.0](https://github.com/nerves-project/nerves_system_br/releases/tag/v1.3.0)
+
+## v1.1.1
+
+This release fixes some issues and adds firmware UUID support. This support can
+be used to unambiguously know what's running on a device.
+
+* Updated dependencies
+  * [nerves_system_br v1.2.2](https://github.com/nerves-project/nerves_system_br/releases/tag/v1.2.2)
+
+* Bug fixes
+  * Empty serial numbers stored in the U-Boot environment would be used instead
+    of reverting to devices IDs built into the CPU or board.
+  * It wasn't possible to enable QtWebEngine (needed for kiosk apps)
+
+## v1.1.0
+
+This release adds official support for provisioning serial numbers to devices.
+Other information can be provisioned in a similar manner. See the README.md for
+details.
+
+Buildroot was also updated to 2018.05. Be sure to review the `nerves_system_br`
+link for the changes in the embedded Linux components.
+
+* Updated dependencies
+  * [nerves_system_br v1.2.0](https://github.com/nerves-project/nerves_system_br/releases/tag/v1.2.0)
+
+* New features
+  * More `wpa-supplicant` features were enabled to support more WiFi use-cases
+
 ## v1.0.0
 
 This release is nearly identical to rc.1 except with the deps bump to 1.0 and
