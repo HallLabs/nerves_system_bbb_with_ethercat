@@ -5,3 +5,4 @@
 
 source "$NERVES_DEFCONFIG_DIR/package/atemsys/Config.in"
 source "$NERVES_DEFCONFIG_DIR/package/etherlab/Config.in"
+source "$NERVES_DEFCONFIG_DIR/package/rtl8812AU/Config.in"
