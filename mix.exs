@@ -35,7 +35,7 @@ defmodule NervesSystemBbb.MixProject do
     [
       type: :system,
       artifact_sites: [
-        {:github_releases, "NewVistas/#{@app}"}
+        {:github_releases, "HallLabs/#{@app}"}
       ],
       build_runner_opts: build_runner_opts(),
       platform: Nerves.System.BR,
@@ -67,7 +67,7 @@ defmodule NervesSystemBbb.MixProject do
       maintainers: ["Robert Brown"],
       files: package_files(),
       licenses: ["Apache 2.0"],
-      links: %{"Github" => "https://github.com/NewVistas/#{@app}"}
+      links: %{"Github" => "https://github.com/HallLabs/#{@app}"}
     ]
   end
 
